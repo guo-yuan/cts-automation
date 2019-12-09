@@ -37,7 +37,7 @@ else:
     logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 streamHandler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt='%d-%b-%y %H:%M:%S')
 streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
 
@@ -113,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("-id", "--clientId", action="store", dest="clientId", default=clientId, 
                         help="Targeted client id")
     parser.add_argument("-t", "--topic", action="store", dest="topic", default=topicRequest, help="Targeted topic")
+    parser.add_argument("-ta", "--target", action="store", dest="target", default="8.8.8.8", help="Test target")
 
     args = parser.parse_args()
     clientCert = args.certificatePath
@@ -126,17 +127,19 @@ if __name__ == "__main__":
         exit(2)
 
     print("CPE connectivity test in loop.\n")
-
     clientInit(checkOutcome, useWebsocket)
-    requestTest()
+
     while True:
-        while not testConcluded.wait(timeout=10):
+        if not args.target:
             requestTest()
-        
+        else:
+            requestTest(args.target)
+
+        testConcluded.wait(timeout=10)
         if testSucceed:
             print("CPE connectivity test succeeded.\n")
         else:
             print("CPE connectivity test failed.\n")
-
         testConcluded.clear()
         testSucceed = False
+        time.sleep(10)
