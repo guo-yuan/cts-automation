@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Run tests and generate JUnit formatted test report for gw provisioning tests
@@ -11,15 +11,15 @@ from test_config import *
 
 class GwTestCases(unittest.TestCase):
     def test_basic(self):
-        self.assertTrue(t.run_test('basic'), msg='Basic provisioning test failed')
+        self.assertTrue(t.run_test('basic'), msg='Basic provisioning test failed.')
 
     @unittest.skip('Test scenario not supported yet')
     def test_Telstra(self):
-        self.assertTrue(t.run_test('Telstra'), msg='Telstra provsioning test failed')
+        self.assertTrue(t.run_test('Telstra'), msg='Telstra provsioning test failed.')
 
     @unittest.expectedFailure
     def test_other(self):
-        self.assertTrue(t.run_test('other'), msg='Other provisioning test failed')
+        self.assertTrue(t.run_test('other'), msg='Other provisioning test failed.')
 
 
 if __name__ == '__main__':
