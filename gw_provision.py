@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 CTS GW provisioning test.
@@ -7,14 +7,23 @@ Usage:
     python(python3) gw_provision.py <test_case>
 """
 
-import sys, os, time, json, datetime
+import sys, os, time, json, datetime, logging
 import unittest
-# import paramiko
+import cpeTest
 from pyHS100 import SmartPlug
 from test_config import *
 
-report = {'case': '', 'result': '', 'reason': '', 'timestamp': ''}
+if __name__ == "__main__":
+    logger = logging.getLogger("GW Test")
+else:
+    logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+streamHandler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt='%d-%b-%y %H:%M:%S')
+streamHandler.setFormatter(formatter)
+logger.addHandler(streamHandler)
 
+#logging.basicConfig(format='%(asctime)s CTS Test: %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
 
 def basic_test():
     """ Execute a basic provisioning test.
@@ -26,54 +35,50 @@ def basic_test():
     global report
     report['case'] = 'basic'
 
-    print('Step 1: toggle DUT power...')
+    logger.info('Step 1 - toggle DUT power...')
     p = SmartPlug(smart_plug_ip)
     try:
-        p.state = 'OFF'
+#        p.state = 'OFF'
         time.sleep(3)
-        p.state = 'ON'
+#        p.state = 'ON'
     except Exception:
-        print('Fail to toggle DUT power.')
+        logger.info('Fail to toggle DUT power.')
         report['result'] = 'Aborted'
         report['reason'] = 'Fail to toggle DUT power'
         return
 
     # time.sleep(120)
-    print('Wait and allow DUT to boot...')
+    logger.info('Wait and allow DUT to boot...')
 
-    print('Step 2: GW controller action...')
+    logger.info('Step 2 - GW controller action...')
     shell_cmd = 'cd %s; %s %s H1.1 xDSL1 on' % (gw_controller_dir, gw_controller_exe, gw_controller_ip)
-    print(shell_cmd)
-    ret = os.system(shell_cmd)
-    if ret != 0:
-        print('Fail to run GW controller.')
-        report['result'] = 'Aborted'
-        report['reason'] = 'Fail to run GW controller'
-        return
+    logger.info(shell_cmd)
+#    ret = os.system(shell_cmd)
+#    if ret != 0:
+#        logger.info('Fail to run GW controller.')
+#        report['result'] = 'Aborted'
+#        report['reason'] = 'Fail to run GW controller'
+#        return
 
     # time.sleep(120)
-    print('Wait and allow DUT WAN connection to connect...')
+    logger.info('Wait and allow DUT WAN connection to connect...')
 
-    print('Step 3: Check Internet connection on a CPE connected to DUT...')
+    logger.info('Step 3 - Check Internet connection on a CPE connected to DUT...')
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(cpe_ip, username=cpe_ssh_username, password=cpe_ssh_passwd)
+        cpeTest.clientInit(cpeTest.checkOutcome)
+        cpeTest.requestTest("8.8.8.8")
+        cpeTest.testConcluded.wait(timeout=10)
     except Exception:
-        print('Fail to connect to test CPE.')
+        logger.info('Fail to initiate CPE connectivity test.')
         report['result'] = 'Failed'
-        report['reason'] = 'Fail to connect test CPE'
+        report['reason'] = 'Fail to initiate CPE connectivity test'
         return
 
-    shell_cmd = 'ping 8.8.8.8 -c 5'
-    _, ssh_stdout, _ = ssh.exec_command(shell_cmd)
-    if ssh_stdout.find('0% packet loss') == -1:
-        print('Fail to ping Internet from test CPE.')
+    if not cpeTest.testSucceed:
         report['result'] = 'Failed'
-        report['reason'] = 'Fail to ping Internet from test CPE'
-        return
+        report['reason'] = 'CPE device has no Internet connectivity.'
+        return False
 
-    print('Test successfully completed.')
     report['result'] = 'Success'
     return True
 
@@ -82,28 +87,35 @@ def run_test(case):
     """
     Main entry for GW provisioning tests.
 
-    :param case: test case selection
-    :return: none
+    Args: case: test case selection
+    Return: True if test case pass 
     """
+    global report
+    report = {'case': '', 'result': '', 'reason': '', 'timestamp': ''}
+    result = False
+
     if 'basic' == case:
-        print('Run basic test')
-        basic_test()
+        print('Run basic test...')
+        result = basic_test()
     elif 'Telstra' == case:
-        print('Test case %s to be supported' % case)
+        logger.info('Test case %s to be supported.' % case)
     else:
-        print('Test scenario %s is invalid. Please use scenario: [Basic|Telstra].' % case)
-        return False
+        logger.info('Test scenario %s is invalid. Please use scenario: [Basic|Telstra].' % case)
+
+    print('Test report: ', report)
+    return result
 
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-        print('No test case specified.')
-        exit(0)
+        print('No test case specified. Available cases: basic, Telstra.')
+        sys.argv.append('basic')
+
     run_test(sys.argv[1])
     test_timestamp = str(datetime.datetime.now())
     report['timestamp'] = test_timestamp
     json_report = json.dumps(report, indent=4, separators=(', ', ': '))
-    print(json_report)
+    logger.info(json_report)
 
     fh = open('gw_provision_report.txt', 'w')
     fh.write('GW provisioning test report generated at ' + test_timestamp + '\n\n')
